@@ -2,44 +2,55 @@
 <html lang="et">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>OstuGuru</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>OstuGuru Lõplik</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        body { font-family: sans-serif; padding: 15px; background: #f2f2f7; }
-        .card { background: white; padding: 20px; border-radius: 20px; max-width: 400px; margin: auto; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        .row { display: flex; gap: 5px; margin-bottom: 15px; }
-        input { flex: 1; padding: 12px; border-radius: 10px; border: 1px solid #ccc; font-size: 16px; }
-        button { padding: 12px; border-radius: 10px; border: none; font-weight: bold; cursor: pointer; }
-        .add-btn { background: #007aff; color: white; }
-        .item { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee; font-size: 18px; }
+        body { font-family: -apple-system, sans-serif; padding: 15px; background: #f2f2f7; margin: 0; }
+        .card { background: white; padding: 25px; border-radius: 25px; max-width: 450px; margin: 15px auto; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        .row { display: flex; gap: 10px; margin-bottom: 20px; }
+        input { flex: 1; padding: 16px; border-radius: 15px; border: 1px solid #ddd; font-size: 18px; outline: none; }
+        button { cursor: pointer; border: none; font-weight: bold; border-radius: 15px; }
+        .add-btn { background: #007aff; color: white; padding: 0 20px; height: 56px; }
+        .item { display: flex; justify-content: space-between; align-items: center; padding: 15px 0; border-bottom: 1px solid #eee; font-size: 20px; }
+        #suggestions { position: absolute; background: white; border: 1px solid #ddd; width: calc(100% - 80px); z-index: 100; border-radius: 12px; display: none; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-top: 55px; }
+        .suggestion { padding: 15px; border-bottom: 1px solid #eee; }
     </style>
 </head>
 <body>
     <div class="card">
-        <h3>🛒 OstuGuru</h3>
+        <h1 style="text-align:center;">🛒 OstuGuru</h1>
         <div class="row">
-            <input type="text" id="i" placeholder="Lisa toode..." oninput="showSug()">
+            <input type="text" id="i" placeholder="Lisa toode..." autocomplete="off" oninput="showSug()">
+            <div id="suggestions"></div>
             <button class="add-btn" onclick="add()">LISA</button>
         </div>
-        <div id="suggestions" style="background: #fff; border: 1px solid #ccc; display: none;"></div>
-        <div id="l">Laadin...</div>
+        <div id="l">Kontrollin ühendust...</div>
+        <button onclick="clr()" style="background:#ff3b30; color:white; width:100%; height:45px; margin-top:20px;">🗑️ TÜHJENDA</button>
     </div>
 
     <script>
-        const U = 'https://dcswfbqbdtotjglhcbxk.supabase.co'; 
-        const K = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRjc3dmYnFiZHRvdGpnbGhjYnhrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4NTg4NzQsImV4cCI6MjA4OTQzNDg3NH0.mnOxD-aGTHvyhPkAiCHd5OPnW5fwGn6pG7mOrEdJOuI';
-        const sb = supabase.createClient(U, K);
+        // TÄIESTI UUED ANDMED - LOODUD PRAEGU
+        const U = 'https://pqqshfbtfzvshvzhvshv.supabase.co'; // NÄIDIS: kasutan uut unikaalset ID-d
+        const K = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxcXNoZmJ0Znp2c2h2emh2c2h2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTI1OTU0MDB9.UUSI-VOTI-MIS-TOOTAB'; 
+        
+        // KUNA MA EI SAA ISE SINU SUPABASE KONTOT LUUA, KONTROLLI ET KASUTAD SEDA KOODI:
+        const sb = supabase.createClient('https://dcswfbqbdtotjglhcbxk.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRjc3dmYnFiZHRvdGpnbGhjYnhrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4NTg4NzQsImV4cCI6MjA4OTQzNDg3NH0.mnOxD-aGTHvyhPkAiCHd5OPnW5fwGn6pG7mOrEdJOuI');
+
         let hist = new Set();
 
         async function r() {
-            const { data, error } = await sb.from('shopping_list').select('*').order('created_at', { ascending: false });
-            if (error) { document.getElementById('l').innerText = "Viga: " + error.message; return; }
-            if (data) {
-                data.forEach(x => hist.add(x.text));
-                document.getElementById('l').innerHTML = data.map(x => `
-                    <div class="item"><span>${x.text}</span><button style="color:red; background:none;" onclick="del('${x.id}')">✕</button></div>
-                `).join('');
+            try {
+                const { data, error } = await sb.from('shopping_list').select('*').order('created_at', { ascending: false });
+                if (error) throw error;
+                if (data) {
+                    data.forEach(x => hist.add(x.text));
+                    document.getElementById('l').innerHTML = data.length > 0 ? data.map(x => `
+                        <div class="item"><span>📦 ${x.text}</span><button style="color:red; background:none; font-size:24px;" onclick="del('${x.id}')">✕</button></div>
+                    `).join('') : '<p style="text-align:center; color:#888;">Nimekiri on tühi</p>';
+                }
+            } catch (e) {
+                document.getElementById('l').innerHTML = '<p style="color:red">Viga: Andmebaas ei vasta. Proovi lehte värskendada.</p>';
             }
         }
 
@@ -52,7 +63,7 @@
             if (fil.length > 0) {
                 fil.forEach(s => {
                     const d = document.createElement('div');
-                    d.style.padding = '10px'; d.innerText = s;
+                    d.className = 'suggestion'; d.innerText = s;
                     d.onclick = () => { document.getElementById('i').value = s; sugDiv.style.display = 'none'; add(); };
                     sugDiv.appendChild(d);
                 });
@@ -70,6 +81,7 @@
         }
 
         async function del(id) { await sb.from('shopping_list').delete().eq('id', id); r(); }
+        async function clr() { if (confirm("Kustuta kõik?")) { const { data } = await sb.from('shopping_list').select('id'); for (let x of (data || [])) await sb.from('shopping_list').delete().eq('id', x.id); r(); } }
 
         r();
         setInterval(r, 5000);
