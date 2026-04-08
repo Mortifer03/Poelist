@@ -2,74 +2,50 @@
 <html lang="et">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>OstuGuru Ühine</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>OstuGuru Lõplik</title>
     <style>
-        body { font-family: -apple-system, sans-serif; padding: 15px; background: #f2f2f7; margin: 0; }
-        .card { background: white; padding: 25px; border-radius: 25px; max-width: 450px; margin: 15px auto; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        body { font-family: -apple-system, sans-serif; padding: 15px; background: #f2f2f7; margin: 0; text-align: center; }
+        .card { background: white; padding: 25px; border-radius: 25px; max-width: 450px; margin: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
         .row { display: flex; gap: 10px; margin-bottom: 20px; }
-        input { flex: 1; padding: 16px; border-radius: 15px; border: 1px solid #ddd; font-size: 18px; outline: none; background: #f9f9f9; }
-        button { cursor: pointer; border: none; font-weight: bold; border-radius: 15px; height: 56px; }
-        .add-btn { background: #007aff; color: white; padding: 0 25px; }
+        input { flex: 1; padding: 16px; border-radius: 15px; border: 1px solid #ddd; font-size: 18px; outline: none; }
+        button { cursor: pointer; border: none; font-weight: bold; border-radius: 15px; height: 56px; background: #007aff; color: white; padding: 0 20px; }
         .item { display: flex; justify-content: space-between; align-items: center; padding: 15px 0; border-bottom: 1px solid #eee; font-size: 20px; }
-        .del-btn { color: #ff3b30; background: none; font-size: 28px; padding: 5px; }
-        #l { min-height: 50px; }
     </style>
 </head>
 <body>
     <div class="card">
-        <h1 style="text-align:center; margin-bottom:20px;">🛒 OstuGuru</h1>
+        <h1>🛒 OstuGuru</h1>
         <div class="row">
-            <input type="text" id="i" placeholder="Lisa toode..." autocomplete="off">
-            <button class="add-btn" onclick="add()">LISA</button>
+            <input type="text" id="i" placeholder="Lisa toode...">
+            <button onclick="add()">LISA</button>
         </div>
-        <div id="l">Laadin nimekirja...</div>
-        <button onclick="clr()" style="background:#ff3b30; color:white; width:100%; height:50px; margin-top:30px; font-size:16px;">🗑️ TÜHJENDA NIMEKIRI</button>
+        <div id="l">Laadin...</div>
     </div>
 
     <script>
-        // See on Sinu unikaalne andmehoidla ID
-        const STORAGE_URL = 'https://api.npoint.io/652f758079714856606a'; 
+        const URL = 'https://script.google.com/macros/s/AKfycbxATYJCnKK5ffzrgi25YaDNpLQ_a5bFQJLEn6QuzSoev1NaRgOmH9gpnO2gueL1ckPuIg/exec'; 
         let items = [];
 
-        // 1. Lae nimekiri pilvest
         async function r() {
             try {
-                const res = await fetch(STORAGE_URL);
-                const data = await res.json();
-                items = data.items || [];
-                render();
-            } catch (e) {
-                document.getElementById('l').innerText = "Viga ühenduses!";
-            }
+                const res = await fetch(URL);
+                items = await res.json();
+                document.getElementById('l').innerHTML = items.map((x, idx) => `
+                    <div class="item"><span>📦 ${x}</span><button style="background:none; color:red; font-size:25px;" onclick="del(${idx})">✕</button></div>
+                `).join('') || 'Nimekiri on tühi';
+            } catch (e) { document.getElementById('l').innerText = "Viga ühenduses!"; }
         }
 
-        // 2. Kuva nimekiri ekraanil
-        function render() {
-            document.getElementById('l').innerHTML = items.length > 0 ? items.map((x, idx) => `
-                <div class="item"><span>📦 ${x}</span><button class="del-btn" onclick="del(${idx})">✕</button></div>
-            `).join('') : '<p style="text-align:center; color:#8e8e93; margin:20px 0;">Nimekiri on tühi</p>';
-        }
-
-        // 3. Salvesta nimekiri pilve (et teised näeksid)
         async function save() {
-            try {
-                await fetch(STORAGE_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ items: items })
-                });
-                render();
-            } catch (e) {
-                alert("Salvestamine ebaõnnestus!");
-            }
+            await fetch(URL, { method: 'POST', body: JSON.stringify(items) });
+            r();
         }
 
         function add() {
             const i = document.getElementById('i');
-            const t = i.value.trim();
-            if (!t) return;
-            items.unshift(t); // Lisa algusesse
+            if (!i.value.trim()) return;
+            items.unshift(i.value.trim());
             i.value = '';
             save();
         }
@@ -79,16 +55,7 @@
             save();
         }
 
-        function clr() {
-            if (confirm("Kas tühjendame kogu nimekirja?")) {
-                items = [];
-                save();
-            }
-        }
-
-        // Alusta tööd
         r();
-        // Kontrolli uuendusi iga 5 sekundi järel
         setInterval(r, 5000);
     </script>
 </body>
