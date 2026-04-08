@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="et">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>OstuGuru Lõplik</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: -apple-system, sans-serif; padding: 15px; background: #f2f2f7; margin: 0; }
+        .card { background: white; padding: 25px; border-radius: 30px; max-width: 450px; margin: 10px auto; box-shadow: 0 10px 30px rgba(0,0,0,0.1); position: relative; }
+        .row { display: flex; gap: 10px; margin-bottom: 20px; }
+        .input-wrapper { flex: 1; position: relative; }
+        input { width: 100%; padding: 16px; border-radius: 15px; border: 1px solid #e5e5ea; font-size: 18px; outline: none; background: #f9f9f9; box-sizing: border-box; }
+        #suggestions { position: absolute; background: white; border: 1px solid #e5e5ea; width: 100%; z-index: 9999; border-radius: 15px; box-shadow: 0 12px 24px rgba(0,0,0,0.15); display: none; margin-top: 5px; max-height: 250px; overflow-y: auto; }
+        .suggestion { padding: 16px; border-bottom: 1px solid #f2f2f7; font-size: 18px; color: #1c1c1e; }
+        button { cursor: pointer; border: none; font-weight: bold; border-radius: 15px; height: 56px; }
+        #micBtn { background: #34c759; color: white; width: 65px; font-size: 26px; display: none; align-items: center; justify-content: center; }
+        .add-btn { background: #007aff; color: white; padding: 0 25px; font-size: 16px; }
+        .item { display: flex; justify-content: space-between; align-items: center; padding: 15px 0; border-bottom: 1px solid #f2f2f7; font-size: 20px; }
+        .del-btn { color: #ff3b30; background: none; font-size: 28px; }
+        .clear-btn { background: #ff3b30; color: white; width: 100%; margin-top: 25px; height: 50px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1 style="text-align:center;">🛒 OstuGuru</h1>
+        <div class="row">
+            <div class="input-wrapper">
+                <input type="text" id="i" placeholder="Lisa toode..." autocomplete="off" oninput="showSug()">
+                <div id="suggestions"></div>
+            </div>
+            <button id="micBtn" onclick="startV()">🎤</button>
+            <button class="add-btn" onclick="add()">LISA</button>
+        </div>
+        <div id="l">Laadin...</div>
+        <button class="clear-btn" onclick="clr()">🗑️ TÜHJENDA NIMEKIRI</button>
+    </div>
+
+    <script>
+        const U = 'https://dcswfbqbdtotjglhcbxk.supabase.co'; 
+        const K = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRjc3dmYnFiZHRvdGpnbGhjYnhrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4NTg4NzQsImV4cCI6MjA4OTQzNDg3NH0.mnOxD-aGTHvyhPkAiCHd5OPnW5fwGn6pG7mOrEdJOuI';
+        const sb = supabase.createClient(U, K);
+        let hist = new Set(); 
+
+        if (!/iPad|iPhone|iPod/.test(navigator.userAgent)) document.getElementById('micBtn').style.display = 'flex';
+
+        async function r() {
+            const { data } = await sb.from('shopping_list').select('*').order('created_at', { ascending: false });
+            if (data) {
+                data.forEach(x => hist.add(x.text)); 
+                document.getElementById('l').innerHTML = data.length > 0 ? data.map(x => `
+                    <div class="item"><span>📦 ${x.text}</span><button class="del-btn" onclick="del('${x.id}')">✕</button></div>
+                `).join('') : '<p style="text-align:center; color:#8e8e93;">Nimekiri on tühi</p>';
+            }
+        }
+
+        function showSug() {
+            const val = document.getElementById('i').value.toLowerCase();
+            const sugDiv = document.getElementById('suggestions');
+            sugDiv.innerHTML = '';
+            if (val.length < 1) { sugDiv.style.display = 'none'; return; }
+            const fil = Array.from(hist).filter(x => x.toLowerCase().startsWith(val)).slice(0, 6);
+            if (fil.length > 0) {
+                fil.forEach(s => {
+                    const d = document.createElement('div');
+                    d.className = 'suggestion'; d.innerText = s;
+                    d.onclick = () => { document.getElementById('i').value = s; sugDiv.style.display = 'none'; add(); };
+                    sugDiv.appendChild(d);
+                });
+                sugDiv.style.display = 'block';
+            } else sugDiv.style.display = 'none';
+        }
+
+        async function add() {
+            const i = document.getElementById('i');
+            const t = i.value.trim();
+            if (!t) return;
+            i.value = '';
+            document.getElementById('suggestions').style.display = 'none';
+            await sb.from('shopping_list').insert([{ text: t }]);
+            r();
+        }
+
+        async function del(id) { await sb.from('shopping_list').delete().eq('id', id); r(); }
+        async function clr() { if (confirm("Kustuta kõik?")) { const { data } = await sb.from('shopping_list').select('id'); for (let x of (data || [])) await sb.from('shopping_list').delete().eq('id', x.id); r(); } }
+
+        function startV() {
+            const S = window.webkitSpeechRecognition || window.SpeechRecognition;
+            if (!S) return;
+            const rec = new S(); rec.lang = 'et-EE';
+            rec.onresult = (e) => { document.getElementById('i').value = e.results[0][0].transcript; add(); };
+            rec.start();
+        }
+
+        r();
+        setInterval(r, 4000);
+    </script>
+</body>
+</html>
