@@ -1,26 +1,30 @@
+Vabandan südamest! Saan täielikult aru, miks sa vihane oled. See "viivitus" on asi, mille peale ma oleksin pidanud kohe alguses mõtlema, eriti kuna sa soovisid kiiret ja sujuvat lahendust.
+
+Minu viga oli see, et keskendusin liigselt sellele, et andmed üldse Google'isse ja GitHubi vahel liikuma saaks (et see "Viga" kaoks), ning unustasin ära kasutajamugavuse ehk selle, et ekraan peab reageerima kohe, mitte ootama serveri järgi.
+Siin on see parandatud ja "välgu-kiire" versioon
+
+Selles koodis on nüüd "Optimistic UI" – see tähendab, et kui sa vajutad "LISA" või "KUSTUTA", siis äpp muudab nimekirja su ekraanil silmapilkselt ja saadab andmed taustal Google'isse alles siis, kui sina juba uut asja trükid.
+
+Pane see GitHubi index.html sisse ja see "uimamine" on kadunud:
+HTML
+
 <!DOCTYPE html>
 <html lang="et">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>OstuGuru Pro</title>
+    <title>OstuGuru Turbo</title>
     <style>
         body { font-family: -apple-system, sans-serif; padding: 15px; background: #f2f2f7; margin: 0; }
         .card { background: white; padding: 25px; border-radius: 25px; max-width: 450px; margin: 10px auto; box-shadow: 0 10px 30px rgba(0,0,0,0.1); position: relative; }
         .row { display: flex; gap: 8px; margin-bottom: 20px; }
         .input-wrapper { flex: 1; position: relative; }
         input { width: 100%; padding: 16px; border-radius: 15px; border: 1px solid #ddd; font-size: 18px; outline: none; background: #f9f9f9; box-sizing: border-box; }
-        
-        #suggestions { 
-            position: absolute; background: white; border: 1px solid #ddd; width: 100%; z-index: 1000; 
-            border-radius: 15px; box-shadow: 0 8px 20px rgba(0,0,0,0.15); display: none; margin-top: 5px; max-height: 200px; overflow-y: auto;
-        }
+        #suggestions { position: absolute; background: white; border: 1px solid #ddd; width: 100%; z-index: 1000; border-radius: 15px; box-shadow: 0 8px 20px rgba(0,0,0,0.15); display: none; margin-top: 5px; max-height: 200px; overflow-y: auto; }
         .suggestion { padding: 15px; border-bottom: 1px solid #eee; font-size: 18px; color: #1c1c1e; }
-        
         button { cursor: pointer; border: none; font-weight: bold; border-radius: 15px; height: 56px; }
         #micBtn { background: #34c759; color: white; width: 60px; font-size: 24px; display: none; align-items: center; justify-content: center; }
         .add-btn { background: #007aff; color: white; padding: 0 20px; }
-        
         .item { display: flex; justify-content: space-between; align-items: center; padding: 15px 0; border-bottom: 1px solid #eee; font-size: 20px; }
         .del-btn { color: #ff3b30; background: none; font-size: 28px; padding: 5px; }
         .clear-btn { background: #ff3b30; color: white; width: 100%; margin-top: 25px; height: 50px; font-size: 16px; }
@@ -37,7 +41,7 @@
             <button id="micBtn" onclick="startV()">🎤</button>
             <button class="add-btn" onclick="add()">LISA</button>
         </div>
-        <div id="l">Uuendan nimekirja...</div>
+        <div id="l">Uuendan...</div>
         <button class="clear-btn" onclick="clr()">🗑️ TÜHJENDA NIMEKIRI</button>
     </div>
 
@@ -54,14 +58,21 @@
             try {
                 const res = await fetch(URL);
                 const text = await res.text();
-                items = JSON.parse(text || '[]');
+                const newItems = JSON.parse(text || '[]');
                 
-                items.forEach(x => history.add(x));
-                
-                document.getElementById('l').innerHTML = items.length > 0 ? items.map((x, idx) => `
-                    <div class="item"><span>📦 ${x}</span><button class="del-btn" onclick="del(${idx})">✕</button></div>
-                `).join('') : '<p style="text-align:center; color:#888;">Nimekiri on tühi</p>';
-            } catch (e) { console.log("Viga lugemisel"); }
+                // Ainult siis, kui välised andmed erinevad meie omadest, uuendame vaadet
+                if (JSON.stringify(newItems) !== JSON.stringify(items)) {
+                    items = newItems;
+                    items.forEach(x => history.add(x));
+                    renderUI();
+                }
+            } catch (e) { console.log("Viga"); }
+        }
+
+        function renderUI() {
+            document.getElementById('l').innerHTML = items.length > 0 ? items.map((x, idx) => `
+                <div class="item"><span>📦 ${x}</span><button class="del-btn" onclick="del(${idx})">✕</button></div>
+            `).join('') : '<p style="text-align:center; color:#888;">Nimekiri on tühi</p>';
         }
 
         function showSug() {
@@ -69,9 +80,7 @@
             const sugDiv = document.getElementById('suggestions');
             sugDiv.innerHTML = '';
             if (val.length < 1) { sugDiv.style.display = 'none'; return; }
-            
             const fil = Array.from(history).filter(x => x.toLowerCase().startsWith(val)).slice(0, 5);
-            
             if (fil.length > 0) {
                 fil.forEach(s => {
                     const d = document.createElement('div');
@@ -88,41 +97,33 @@
                 await fetch(URL, {
                     method: 'POST',
                     mode: 'no-cors',
-                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(items)
                 });
-                setTimeout(r, 800);
-            } catch (e) { console.log("Viga salvestamisel"); }
+            } catch (e) { console.log("Salvestusviga"); }
         }
 
         function add() {
             const i = document.getElementById('i');
             const t = i.value.trim();
             if (!t) return;
-            items.unshift(t);
+            items.unshift(t); // Lisa nimekirja algusesse
             history.add(t);
             i.value = '';
             document.getElementById('suggestions').style.display = 'none';
-            renderLocal();
-            save();
-        }
-
-        function renderLocal() {
-            document.getElementById('l').innerHTML = items.map((x, idx) => `
-                <div class="item"><span>📦 ${x}</span><button class="del-btn" onclick="del(${idx})">✕</button></div>
-            `).join('');
+            renderUI(); // NÄITA KOHE!
+            save(); // SAADA TAUSTAL!
         }
 
         function del(idx) {
             items.splice(idx, 1);
-            renderLocal();
-            save();
+            renderUI(); // NÄITA KOHE!
+            save(); // SAADA TAUSTAL!
         }
 
-        async function clr() {
-            if (confirm("Kas tühjendame kogu nimekirja?")) {
+        function clr() {
+            if (confirm("Kas tühjendame?")) {
                 items = [];
-                renderLocal();
+                renderUI();
                 save();
             }
         }
@@ -136,7 +137,7 @@
         }
 
         r();
-        setInterval(r, 5000);
+        setInterval(r, 2500); // Kontrolli teiste seadmete muudatusi iga 2.5 sek järel
         document.addEventListener('click', (e) => { if (e.target.id !== 'i') document.getElementById('suggestions').style.display = 'none'; });
     </script>
 </body>
