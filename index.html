@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>OstuGuru Final Fix</title>
+    <title>OstuGuru Final</title>
     <style>
         body { font-family: -apple-system, sans-serif; padding: 15px; background: #f2f2f7; margin: 0; }
         .card { background: white; padding: 25px; border-radius: 25px; max-width: 450px; margin: 10px auto; box-shadow: 0 10px 30px rgba(0,0,0,0.1); position: relative; }
@@ -31,7 +31,7 @@
             <button id="micBtn" onclick="startV()">🎤</button>
             <button class="add-btn" onclick="add()">LISA</button>
         </div>
-        <div id="l">Laadin nimekirja...</div>
+        <div id="l">Andmete sünkroonimine...</div>
         <button class="clear-btn" onclick="clr()">🗑️ TÜHJENDA NIMEKIRI</button>
     </div>
 
@@ -39,26 +39,28 @@
         const URL = 'https://script.google.com/macros/s/AKfycbxATYJCnKK5ffzrgi25YaDNpLQ_a5bFQJLEn6QuzSoev1NaRgOmH9gpnO2gueL1ckPuIg/exec'; 
         let items = [];
         let history = new Set(); 
-        let lastActionTime = 0; // Aeg, millal viimati midagi muudeti
+        let ignoreServerUntil = 0; 
 
         if (!/iPad|iPhone|iPod/.test(navigator.userAgent)) {
             document.getElementById('micBtn').style.display = 'flex';
         }
 
         async function r() {
-            // Kui viimasest tegevusest on möödas vähem kui 5 sekundit, siis me ei uuenda pilvest!
-            if (Date.now() - lastActionTime < 5000) return;
+            // Kui me just ise midagi muutsime, ignoreerime serverit 10 sekundit
+            if (Date.now() < ignoreServerUntil) return;
 
             try {
                 const res = await fetch(URL);
                 const text = await res.text();
                 const newItems = JSON.parse(text || '[]');
+                
+                // Ainult siis uuendame, kui serveri andmed on teised
                 if (JSON.stringify(newItems) !== JSON.stringify(items)) {
                     items = newItems;
                     items.forEach(x => history.add(x));
                     renderUI();
                 }
-            } catch (e) { console.log("Värskendus ootel..."); }
+            } catch (e) { console.log("Sync..."); }
         }
 
         function renderUI() {
@@ -84,15 +86,15 @@
             } else { sugDiv.style.display = 'none'; }
         }
 
-        async function save() {
-            lastActionTime = Date.now(); // Märgime tegevuse aja
+        async function sync() {
+            ignoreServerUntil = Date.now() + 10000; // Ignoreeri serveri vastust 10 sek
             try {
                 await fetch(URL, {
                     method: 'POST',
                     mode: 'no-cors',
                     body: JSON.stringify(items)
                 });
-            } catch (e) { console.log("S-viga"); }
+            } catch (e) { console.log("Post error"); }
         }
 
         function add() {
@@ -103,21 +105,21 @@
             history.add(t);
             i.value = '';
             document.getElementById('suggestions').style.display = 'none';
-            renderUI();
-            save();
+            renderUI(); // MUUDATUS ON KOHE NÄHA
+            sync(); // SALVESTA TAUSTAL
         }
 
         function del(idx) {
             items.splice(idx, 1);
-            renderUI();
-            save();
+            renderUI(); // MUUDATUS ON KOHE NÄHA
+            sync(); // SALVESTA TAUSTAL
         }
 
         function clr() {
-            if (confirm("Kas tühjendame kogu nimekirja?")) {
+            if (confirm("Kas tühjendame?")) {
                 items = [];
                 renderUI();
-                save();
+                sync();
             }
         }
 
@@ -130,8 +132,7 @@
         }
 
         r();
-        // Kontrollime teisi seadmeid iga 3 sekundi järel
-        setInterval(r, 3000);
+        setInterval(r, 4000); // Kontrolli teisi seadmeid iga 4 sek järel
         document.addEventListener('click', (e) => { if (e.target.id !== 'i') document.getElementById('suggestions').style.display = 'none'; });
     </script>
 </body>
