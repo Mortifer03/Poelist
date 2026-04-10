@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>OstuGuru Fix</title>
+    <title>OstuGuru Final Fix</title>
     <style>
         body { font-family: -apple-system, sans-serif; padding: 15px; background: #f2f2f7; margin: 0; }
         .card { background: white; padding: 25px; border-radius: 25px; max-width: 450px; margin: 10px auto; box-shadow: 0 10px 30px rgba(0,0,0,0.1); position: relative; }
@@ -31,7 +31,7 @@
             <button id="micBtn" onclick="startV()">🎤</button>
             <button class="add-btn" onclick="add()">LISA</button>
         </div>
-        <div id="l">Laadin...</div>
+        <div id="l">Laadin nimekirja...</div>
         <button class="clear-btn" onclick="clr()">🗑️ TÜHJENDA NIMEKIRI</button>
     </div>
 
@@ -39,14 +39,16 @@
         const URL = 'https://script.google.com/macros/s/AKfycbxATYJCnKK5ffzrgi25YaDNpLQ_a5bFQJLEn6QuzSoev1NaRgOmH9gpnO2gueL1ckPuIg/exec'; 
         let items = [];
         let history = new Set(); 
-        let pauseRefresh = false; // Lukk, mis hoiab ära vana info tagasitulemise
+        let lastActionTime = 0; // Aeg, millal viimati midagi muudeti
 
         if (!/iPad|iPhone|iPod/.test(navigator.userAgent)) {
             document.getElementById('micBtn').style.display = 'flex';
         }
 
         async function r() {
-            if (pauseRefresh) return; // Kui me just muutsime midagi, siis me ei lae väljast peale
+            // Kui viimasest tegevusest on möödas vähem kui 5 sekundit, siis me ei uuenda pilvest!
+            if (Date.now() - lastActionTime < 5000) return;
+
             try {
                 const res = await fetch(URL);
                 const text = await res.text();
@@ -56,7 +58,7 @@
                     items.forEach(x => history.add(x));
                     renderUI();
                 }
-            } catch (e) { console.log("Luku viga"); }
+            } catch (e) { console.log("Värskendus ootel..."); }
         }
 
         function renderUI() {
@@ -83,19 +85,14 @@
         }
 
         async function save() {
-            pauseRefresh = true; // Paneb välise laadimise pausi peale
+            lastActionTime = Date.now(); // Märgime tegevuse aja
             try {
                 await fetch(URL, {
                     method: 'POST',
                     mode: 'no-cors',
                     body: JSON.stringify(items)
                 });
-                // Hoiame pausi 3 sekundit, et server jõuaks seedida
-                setTimeout(() => { pauseRefresh = false; }, 3000);
-            } catch (e) { 
-                console.log("S-viga"); 
-                pauseRefresh = false;
-            }
+            } catch (e) { console.log("S-viga"); }
         }
 
         function add() {
@@ -117,7 +114,7 @@
         }
 
         function clr() {
-            if (confirm("Kas tühjendame?")) {
+            if (confirm("Kas tühjendame kogu nimekirja?")) {
                 items = [];
                 renderUI();
                 save();
@@ -133,7 +130,8 @@
         }
 
         r();
-        setInterval(r, 2500);
+        // Kontrollime teisi seadmeid iga 3 sekundi järel
+        setInterval(r, 3000);
         document.addEventListener('click', (e) => { if (e.target.id !== 'i') document.getElementById('suggestions').style.display = 'none'; });
     </script>
 </body>
