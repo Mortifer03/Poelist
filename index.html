@@ -3,27 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>OstuGuru Lõplik</title>
+    <title>OstuGuru - Sinu List</title>
     <style>
         body { font-family: -apple-system, sans-serif; padding: 15px; background: #f2f2f7; margin: 0; }
         .card { background: white; padding: 25px; border-radius: 25px; max-width: 450px; margin: 10px auto; box-shadow: 0 10px 30px rgba(0,0,0,0.1); position: relative; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .sync-btn { background: #e5e5ea; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 20px; }
         .row { display: flex; gap: 8px; margin-bottom: 20px; }
         .input-wrapper { flex: 1; position: relative; }
         input { width: 100%; padding: 16px; border-radius: 15px; border: 1px solid #ddd; font-size: 18px; outline: none; background: #f9f9f9; box-sizing: border-box; }
         #suggestions { position: absolute; background: white; border: 1px solid #ddd; width: 100%; z-index: 1000; border-radius: 15px; box-shadow: 0 8px 20px rgba(0,0,0,0.15); display: none; margin-top: 5px; max-height: 200px; overflow-y: auto; }
-        .suggestion { padding: 15px; border-bottom: 1px solid #eee; font-size: 18px; color: #1c1c1e; }
+        .suggestion { padding: 15px; border-bottom: 1px solid #eee; font-size: 18px; }
         button { cursor: pointer; border: none; font-weight: bold; border-radius: 15px; height: 56px; }
-        #micBtn { background: #34c759; color: white; width: 60px; font-size: 24px; display: none; align-items: center; justify-content: center; }
-        .add-btn { background: #007aff; color: white; padding: 0 20px; }
+        #micBtn { background: #34c759; color: white; width: 60px; font-size: 24px; display: flex; align-items: center; justify-content: center; }
+        .add-btn { background: #007aff; color: white; padding: 0 25px; }
         .item { display: flex; justify-content: space-between; align-items: center; padding: 15px 0; border-bottom: 1px solid #eee; font-size: 20px; }
         .del-btn { color: #ff3b30; background: none; font-size: 28px; padding: 5px; }
-        .clear-btn { background: #ff3b30; color: white; width: 100%; margin-top: 25px; height: 50px; font-size: 16px; }
-        .status { font-size: 12px; text-align: center; color: #8e8e93; margin-top: 10px; }
+        .clear-btn { background: #ff3b30; color: white; width: 100%; margin-top: 25px; height: 50px; }
+        .syncing { animation: spin 1s linear infinite; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
     <div class="card">
-        <h1 style="text-align:center; margin-bottom:20px;">🛒 OstuGuru</h1>
+        <div class="header">
+            <h1 style="margin:0;">🛒 OstuGuru</h1>
+            <div id="syncIndicator" class="sync-btn" onclick="load()">🔄</div>
+        </div>
+        
         <div class="row">
             <div class="input-wrapper">
                 <input type="text" id="i" placeholder="Lisa toode..." autocomplete="off" oninput="showSug()">
@@ -32,24 +39,26 @@
             <button id="micBtn" onclick="startV()">🎤</button>
             <button class="add-btn" onclick="add()">LISA</button>
         </div>
+        
         <div id="l"></div>
+        
         <button class="clear-btn" onclick="clr()">🗑️ TÜHJENDA NIMEKIRI</button>
-        <div id="st" class="status">Sünkroonis</div>
     </div>
 
     <script>
         const URL = 'https://script.google.com/macros/s/AKfycbxATYJCnKK5ffzrgi25YaDNpLQ_a5bFQJLEn6QuzSoev1NaRgOmH9gpnO2gueL1ckPuIg/exec'; 
         
-        // Laeme kohe telefoni mälust, et poleks ootamist
+        // Laeme kohe telefoni mälust
         let items = JSON.parse(localStorage.getItem('og_items') || '[]');
         let history = new Set(JSON.parse(localStorage.getItem('og_hist') || '[]'));
-        let isSaving = false;
 
-        if (!/iPad|iPhone|iPod/.test(navigator.userAgent)) {
-            document.getElementById('micBtn').style.display = 'flex';
+        // Kuvame kohe alguses mälus olevad asjad
+        renderUI();
+
+        if (navigator.userAgent.indexOf('iPhone') > -1) {
+            document.getElementById('micBtn').style.display = 'none'; // Peidame iPhone'is kui ei toimi
         }
 
-        // 1. KUVAME KOHE
         function renderUI() {
             document.getElementById('l').innerHTML = items.length > 0 ? items.map((x, idx) => `
                 <div class="item"><span>📦 ${x}</span><button class="del-btn" onclick="del(${idx})">✕</button></div>
@@ -58,64 +67,57 @@
             localStorage.setItem('og_hist', JSON.stringify(Array.from(history)));
         }
 
-        // 2. LAEME TAUSTAL
-        async function load() {
-            if (isSaving) return;
+        async function save() {
+            const indicator = document.getElementById('syncIndicator');
+            indicator.classList.add('syncing');
             try {
-                const res = await fetch(URL);
-                const text = await res.text();
-                const remoteItems = JSON.parse(text || '[]');
-                if (JSON.stringify(remoteItems) !== JSON.stringify(items)) {
-                    items = remoteItems;
-                    items.forEach(x => history.add(x));
-                    renderUI();
-                }
-                document.getElementById('st').innerText = "Sünkroonis: " + new Date().toLocaleTimeString();
+                await fetch(URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(items) });
+                setTimeout(() => indicator.classList.remove('syncing'), 1000);
             } catch (e) {
-                document.getElementById('st').innerText = "Ühenduseta (lokaalne)";
+                indicator.classList.remove('syncing');
             }
         }
 
-        // 3. SALVESTAME TAUSTAL
-        async function save() {
-            isSaving = true;
-            document.getElementById('st').innerText = "Salvestan pilve...";
+        async function load() {
+            const indicator = document.getElementById('syncIndicator');
+            indicator.classList.add('syncing');
             try {
-                await fetch(URL, {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    body: JSON.stringify(items)
-                });
-                setTimeout(() => { isSaving = false; }, 2000);
+                const res = await fetch(URL);
+                const cloudItems = await res.json();
+                items = cloudItems;
+                items.forEach(x => history.add(x));
+                renderUI();
+                indicator.classList.remove('syncing');
             } catch (e) {
-                isSaving = false;
+                indicator.classList.remove('syncing');
             }
         }
 
         function add() {
-            const i = document.getElementById('i');
-            const t = i.value.trim();
-            if (!t) return;
-            items.unshift(t);
-            history.add(t);
-            i.value = '';
+            const input = document.getElementById('i');
+            const val = input.value.trim();
+            if (!val) return;
+            
+            items.unshift(val); // Lisa kohe kohalikku nimekirja
+            history.add(val);
+            input.value = '';
             document.getElementById('suggestions').style.display = 'none';
-            renderUI();
-            save();
+            
+            renderUI(); // UUENDAME EKRAANI KOHE
+            save();     // Sünkroniseerime taustal
         }
 
         function del(idx) {
-            items.splice(idx, 1);
-            renderUI();
-            save();
+            items.splice(idx, 1); // Kustuta kohe kohalikust nimekirjast
+            renderUI(); // UUENDAME EKRAANI KOHE
+            save();     // Sünkroniseerime taustal
         }
 
         function clr() {
-            if (confirm("Kas tühjendame?")) {
-                items = [];
-                renderUI();
-                save();
-            }
+            if (!confirm("Tühjenda?")) return;
+            items = [];
+            renderUI();
+            save();
         }
 
         function showSug() {
@@ -143,11 +145,12 @@
             rec.start();
         }
 
-        // Esmane käivitus
-        renderUI();
+        // Esmane laadimine pilvest
         load();
-        setInterval(load, 5000);
-        document.addEventListener('click', (e) => { if (e.target.id !== 'i') document.getElementById('suggestions').style.display = 'none'; });
+        
+        // Kontrolli teiste seadmete muudatusi vaid iga 30 sekundi järel automaatselt,
+        // et mitte segada sinu tegevust. Käsitsi saab värskendada 🔄 nupust.
+        setInterval(load, 30000); 
     </script>
 </body>
 </html>
