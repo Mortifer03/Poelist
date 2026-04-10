@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>OstuGuru Final</title>
+    <title>OstuGuru Lõplik</title>
     <style>
         body { font-family: -apple-system, sans-serif; padding: 15px; background: #f2f2f7; margin: 0; }
         .card { background: white; padding: 25px; border-radius: 25px; max-width: 450px; margin: 10px auto; box-shadow: 0 10px 30px rgba(0,0,0,0.1); position: relative; }
@@ -18,6 +18,7 @@
         .item { display: flex; justify-content: space-between; align-items: center; padding: 15px 0; border-bottom: 1px solid #eee; font-size: 20px; }
         .del-btn { color: #ff3b30; background: none; font-size: 28px; padding: 5px; }
         .clear-btn { background: #ff3b30; color: white; width: 100%; margin-top: 25px; height: 50px; font-size: 16px; }
+        .status { font-size: 12px; text-align: center; color: #8e8e93; margin-top: 10px; }
     </style>
 </head>
 <body>
@@ -31,42 +32,90 @@
             <button id="micBtn" onclick="startV()">🎤</button>
             <button class="add-btn" onclick="add()">LISA</button>
         </div>
-        <div id="l">Andmete sünkroonimine...</div>
+        <div id="l"></div>
         <button class="clear-btn" onclick="clr()">🗑️ TÜHJENDA NIMEKIRI</button>
+        <div id="st" class="status">Sünkroonis</div>
     </div>
 
     <script>
         const URL = 'https://script.google.com/macros/s/AKfycbxATYJCnKK5ffzrgi25YaDNpLQ_a5bFQJLEn6QuzSoev1NaRgOmH9gpnO2gueL1ckPuIg/exec'; 
-        let items = [];
-        let history = new Set(); 
-        let ignoreServerUntil = 0; 
+        
+        // Laeme kohe telefoni mälust, et poleks ootamist
+        let items = JSON.parse(localStorage.getItem('og_items') || '[]');
+        let history = new Set(JSON.parse(localStorage.getItem('og_hist') || '[]'));
+        let isSaving = false;
 
         if (!/iPad|iPhone|iPod/.test(navigator.userAgent)) {
             document.getElementById('micBtn').style.display = 'flex';
         }
 
-        async function r() {
-            // Kui me just ise midagi muutsime, ignoreerime serverit 10 sekundit
-            if (Date.now() < ignoreServerUntil) return;
-
-            try {
-                const res = await fetch(URL);
-                const text = await res.text();
-                const newItems = JSON.parse(text || '[]');
-                
-                // Ainult siis uuendame, kui serveri andmed on teised
-                if (JSON.stringify(newItems) !== JSON.stringify(items)) {
-                    items = newItems;
-                    items.forEach(x => history.add(x));
-                    renderUI();
-                }
-            } catch (e) { console.log("Sync..."); }
-        }
-
+        // 1. KUVAME KOHE
         function renderUI() {
             document.getElementById('l').innerHTML = items.length > 0 ? items.map((x, idx) => `
                 <div class="item"><span>📦 ${x}</span><button class="del-btn" onclick="del(${idx})">✕</button></div>
             `).join('') : '<p style="text-align:center; color:#888;">Nimekiri on tühi</p>';
+            localStorage.setItem('og_items', JSON.stringify(items));
+            localStorage.setItem('og_hist', JSON.stringify(Array.from(history)));
+        }
+
+        // 2. LAEME TAUSTAL
+        async function load() {
+            if (isSaving) return;
+            try {
+                const res = await fetch(URL);
+                const text = await res.text();
+                const remoteItems = JSON.parse(text || '[]');
+                if (JSON.stringify(remoteItems) !== JSON.stringify(items)) {
+                    items = remoteItems;
+                    items.forEach(x => history.add(x));
+                    renderUI();
+                }
+                document.getElementById('st').innerText = "Sünkroonis: " + new Date().toLocaleTimeString();
+            } catch (e) {
+                document.getElementById('st').innerText = "Ühenduseta (lokaalne)";
+            }
+        }
+
+        // 3. SALVESTAME TAUSTAL
+        async function save() {
+            isSaving = true;
+            document.getElementById('st').innerText = "Salvestan pilve...";
+            try {
+                await fetch(URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    body: JSON.stringify(items)
+                });
+                setTimeout(() => { isSaving = false; }, 2000);
+            } catch (e) {
+                isSaving = false;
+            }
+        }
+
+        function add() {
+            const i = document.getElementById('i');
+            const t = i.value.trim();
+            if (!t) return;
+            items.unshift(t);
+            history.add(t);
+            i.value = '';
+            document.getElementById('suggestions').style.display = 'none';
+            renderUI();
+            save();
+        }
+
+        function del(idx) {
+            items.splice(idx, 1);
+            renderUI();
+            save();
+        }
+
+        function clr() {
+            if (confirm("Kas tühjendame?")) {
+                items = [];
+                renderUI();
+                save();
+            }
         }
 
         function showSug() {
@@ -86,43 +135,6 @@
             } else { sugDiv.style.display = 'none'; }
         }
 
-        async function sync() {
-            ignoreServerUntil = Date.now() + 10000; // Ignoreeri serveri vastust 10 sek
-            try {
-                await fetch(URL, {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    body: JSON.stringify(items)
-                });
-            } catch (e) { console.log("Post error"); }
-        }
-
-        function add() {
-            const i = document.getElementById('i');
-            const t = i.value.trim();
-            if (!t) return;
-            items.unshift(t);
-            history.add(t);
-            i.value = '';
-            document.getElementById('suggestions').style.display = 'none';
-            renderUI(); // MUUDATUS ON KOHE NÄHA
-            sync(); // SALVESTA TAUSTAL
-        }
-
-        function del(idx) {
-            items.splice(idx, 1);
-            renderUI(); // MUUDATUS ON KOHE NÄHA
-            sync(); // SALVESTA TAUSTAL
-        }
-
-        function clr() {
-            if (confirm("Kas tühjendame?")) {
-                items = [];
-                renderUI();
-                sync();
-            }
-        }
-
         function startV() {
             const S = window.webkitSpeechRecognition || window.SpeechRecognition;
             if (!S) return;
@@ -131,8 +143,10 @@
             rec.start();
         }
 
-        r();
-        setInterval(r, 4000); // Kontrolli teisi seadmeid iga 4 sek järel
+        // Esmane käivitus
+        renderUI();
+        load();
+        setInterval(load, 5000);
         document.addEventListener('click', (e) => { if (e.target.id !== 'i') document.getElementById('suggestions').style.display = 'none'; });
     </script>
 </body>
