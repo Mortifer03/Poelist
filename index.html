@@ -2,61 +2,142 @@
 <html lang="et">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>OstuGuru Lõplik</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>OstuGuru Pro</title>
     <style>
-        body { font-family: -apple-system, sans-serif; padding: 15px; background: #f2f2f7; margin: 0; text-align: center; }
-        .card { background: white; padding: 25px; border-radius: 25px; max-width: 450px; margin: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
-        .row { display: flex; gap: 10px; margin-bottom: 20px; }
-        input { flex: 1; padding: 16px; border-radius: 15px; border: 1px solid #ddd; font-size: 18px; outline: none; }
-        button { cursor: pointer; border: none; font-weight: bold; border-radius: 15px; height: 56px; background: #007aff; color: white; padding: 0 20px; }
+        body { font-family: -apple-system, sans-serif; padding: 15px; background: #f2f2f7; margin: 0; }
+        .card { background: white; padding: 25px; border-radius: 25px; max-width: 450px; margin: 10px auto; box-shadow: 0 10px 30px rgba(0,0,0,0.1); position: relative; }
+        .row { display: flex; gap: 8px; margin-bottom: 20px; }
+        .input-wrapper { flex: 1; position: relative; }
+        input { width: 100%; padding: 16px; border-radius: 15px; border: 1px solid #ddd; font-size: 18px; outline: none; background: #f9f9f9; box-sizing: border-box; }
+        
+        #suggestions { 
+            position: absolute; background: white; border: 1px solid #ddd; width: 100%; z-index: 1000; 
+            border-radius: 15px; box-shadow: 0 8px 20px rgba(0,0,0,0.15); display: none; margin-top: 5px; max-height: 200px; overflow-y: auto;
+        }
+        .suggestion { padding: 15px; border-bottom: 1px solid #eee; font-size: 18px; color: #1c1c1e; }
+        
+        button { cursor: pointer; border: none; font-weight: bold; border-radius: 15px; height: 56px; }
+        #micBtn { background: #34c759; color: white; width: 60px; font-size: 24px; display: none; align-items: center; justify-content: center; }
+        .add-btn { background: #007aff; color: white; padding: 0 20px; }
+        
         .item { display: flex; justify-content: space-between; align-items: center; padding: 15px 0; border-bottom: 1px solid #eee; font-size: 20px; }
+        .del-btn { color: #ff3b30; background: none; font-size: 28px; padding: 5px; }
+        .clear-btn { background: #ff3b30; color: white; width: 100%; margin-top: 25px; height: 50px; font-size: 16px; }
     </style>
 </head>
 <body>
     <div class="card">
-        <h1>🛒 OstuGuru</h1>
+        <h1 style="text-align:center; margin-bottom:20px;">🛒 OstuGuru</h1>
         <div class="row">
-            <input type="text" id="i" placeholder="Lisa toode...">
-            <button onclick="add()">LISA</button>
+            <div class="input-wrapper">
+                <input type="text" id="i" placeholder="Lisa toode..." autocomplete="off" oninput="showSug()">
+                <div id="suggestions"></div>
+            </div>
+            <button id="micBtn" onclick="startV()">🎤</button>
+            <button class="add-btn" onclick="add()">LISA</button>
         </div>
-        <div id="l">Laadin...</div>
+        <div id="l">Uuendan nimekirja...</div>
+        <button class="clear-btn" onclick="clr()">🗑️ TÜHJENDA NIMEKIRI</button>
     </div>
 
     <script>
         const URL = 'https://script.google.com/macros/s/AKfycbxATYJCnKK5ffzrgi25YaDNpLQ_a5bFQJLEn6QuzSoev1NaRgOmH9gpnO2gueL1ckPuIg/exec'; 
         let items = [];
+        let history = new Set(); 
+
+        if (!/iPad|iPhone|iPod/.test(navigator.userAgent)) {
+            document.getElementById('micBtn').style.display = 'flex';
+        }
 
         async function r() {
             try {
                 const res = await fetch(URL);
-                items = await res.json();
-                document.getElementById('l').innerHTML = items.map((x, idx) => `
-                    <div class="item"><span>📦 ${x}</span><button style="background:none; color:red; font-size:25px;" onclick="del(${idx})">✕</button></div>
-                `).join('') || 'Nimekiri on tühi';
-            } catch (e) { document.getElementById('l').innerText = "Viga ühenduses!"; }
+                const text = await res.text();
+                items = JSON.parse(text || '[]');
+                
+                items.forEach(x => history.add(x));
+                
+                document.getElementById('l').innerHTML = items.length > 0 ? items.map((x, idx) => `
+                    <div class="item"><span>📦 ${x}</span><button class="del-btn" onclick="del(${idx})">✕</button></div>
+                `).join('') : '<p style="text-align:center; color:#888;">Nimekiri on tühi</p>';
+            } catch (e) { console.log("Viga lugemisel"); }
+        }
+
+        function showSug() {
+            const val = document.getElementById('i').value.toLowerCase();
+            const sugDiv = document.getElementById('suggestions');
+            sugDiv.innerHTML = '';
+            if (val.length < 1) { sugDiv.style.display = 'none'; return; }
+            
+            const fil = Array.from(history).filter(x => x.toLowerCase().startsWith(val)).slice(0, 5);
+            
+            if (fil.length > 0) {
+                fil.forEach(s => {
+                    const d = document.createElement('div');
+                    d.className = 'suggestion'; d.innerText = s;
+                    d.onclick = () => { document.getElementById('i').value = s; sugDiv.style.display = 'none'; add(); };
+                    sugDiv.appendChild(d);
+                });
+                sugDiv.style.display = 'block';
+            } else { sugDiv.style.display = 'none'; }
         }
 
         async function save() {
-            await fetch(URL, { method: 'POST', body: JSON.stringify(items) });
-            r();
+            try {
+                await fetch(URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(items)
+                });
+                setTimeout(r, 800);
+            } catch (e) { console.log("Viga salvestamisel"); }
         }
 
         function add() {
             const i = document.getElementById('i');
-            if (!i.value.trim()) return;
-            items.unshift(i.value.trim());
+            const t = i.value.trim();
+            if (!t) return;
+            items.unshift(t);
+            history.add(t);
             i.value = '';
+            document.getElementById('suggestions').style.display = 'none';
+            renderLocal();
             save();
+        }
+
+        function renderLocal() {
+            document.getElementById('l').innerHTML = items.map((x, idx) => `
+                <div class="item"><span>📦 ${x}</span><button class="del-btn" onclick="del(${idx})">✕</button></div>
+            `).join('');
         }
 
         function del(idx) {
             items.splice(idx, 1);
+            renderLocal();
             save();
+        }
+
+        async function clr() {
+            if (confirm("Kas tühjendame kogu nimekirja?")) {
+                items = [];
+                renderLocal();
+                save();
+            }
+        }
+
+        function startV() {
+            const S = window.webkitSpeechRecognition || window.SpeechRecognition;
+            if (!S) return;
+            const rec = new S(); rec.lang = 'et-EE';
+            rec.onresult = (e) => { document.getElementById('i').value = e.results[0][0].transcript; add(); };
+            rec.start();
         }
 
         r();
         setInterval(r, 5000);
+        document.addEventListener('click', (e) => { if (e.target.id !== 'i') document.getElementById('suggestions').style.display = 'none'; });
     </script>
 </body>
 </html>
