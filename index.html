@@ -1,19 +1,9 @@
-Vabandan südamest! Saan täielikult aru, miks sa vihane oled. See "viivitus" on asi, mille peale ma oleksin pidanud kohe alguses mõtlema, eriti kuna sa soovisid kiiret ja sujuvat lahendust.
-
-Minu viga oli see, et keskendusin liigselt sellele, et andmed üldse Google'isse ja GitHubi vahel liikuma saaks (et see "Viga" kaoks), ning unustasin ära kasutajamugavuse ehk selle, et ekraan peab reageerima kohe, mitte ootama serveri järgi.
-Siin on see parandatud ja "välgu-kiire" versioon
-
-Selles koodis on nüüd "Optimistic UI" – see tähendab, et kui sa vajutad "LISA" või "KUSTUTA", siis äpp muudab nimekirja su ekraanil silmapilkselt ja saadab andmed taustal Google'isse alles siis, kui sina juba uut asja trükid.
-
-Pane see GitHubi index.html sisse ja see "uimamine" on kadunud:
-HTML
-
 <!DOCTYPE html>
 <html lang="et">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>OstuGuru Turbo</title>
+    <title>OstuGuru Fix</title>
     <style>
         body { font-family: -apple-system, sans-serif; padding: 15px; background: #f2f2f7; margin: 0; }
         .card { background: white; padding: 25px; border-radius: 25px; max-width: 450px; margin: 10px auto; box-shadow: 0 10px 30px rgba(0,0,0,0.1); position: relative; }
@@ -41,7 +31,7 @@ HTML
             <button id="micBtn" onclick="startV()">🎤</button>
             <button class="add-btn" onclick="add()">LISA</button>
         </div>
-        <div id="l">Uuendan...</div>
+        <div id="l">Laadin...</div>
         <button class="clear-btn" onclick="clr()">🗑️ TÜHJENDA NIMEKIRI</button>
     </div>
 
@@ -49,24 +39,24 @@ HTML
         const URL = 'https://script.google.com/macros/s/AKfycbxATYJCnKK5ffzrgi25YaDNpLQ_a5bFQJLEn6QuzSoev1NaRgOmH9gpnO2gueL1ckPuIg/exec'; 
         let items = [];
         let history = new Set(); 
+        let pauseRefresh = false; // Lukk, mis hoiab ära vana info tagasitulemise
 
         if (!/iPad|iPhone|iPod/.test(navigator.userAgent)) {
             document.getElementById('micBtn').style.display = 'flex';
         }
 
         async function r() {
+            if (pauseRefresh) return; // Kui me just muutsime midagi, siis me ei lae väljast peale
             try {
                 const res = await fetch(URL);
                 const text = await res.text();
                 const newItems = JSON.parse(text || '[]');
-                
-                // Ainult siis, kui välised andmed erinevad meie omadest, uuendame vaadet
                 if (JSON.stringify(newItems) !== JSON.stringify(items)) {
                     items = newItems;
                     items.forEach(x => history.add(x));
                     renderUI();
                 }
-            } catch (e) { console.log("Viga"); }
+            } catch (e) { console.log("Luku viga"); }
         }
 
         function renderUI() {
@@ -93,31 +83,37 @@ HTML
         }
 
         async function save() {
+            pauseRefresh = true; // Paneb välise laadimise pausi peale
             try {
                 await fetch(URL, {
                     method: 'POST',
                     mode: 'no-cors',
                     body: JSON.stringify(items)
                 });
-            } catch (e) { console.log("Salvestusviga"); }
+                // Hoiame pausi 3 sekundit, et server jõuaks seedida
+                setTimeout(() => { pauseRefresh = false; }, 3000);
+            } catch (e) { 
+                console.log("S-viga"); 
+                pauseRefresh = false;
+            }
         }
 
         function add() {
             const i = document.getElementById('i');
             const t = i.value.trim();
             if (!t) return;
-            items.unshift(t); // Lisa nimekirja algusesse
+            items.unshift(t);
             history.add(t);
             i.value = '';
             document.getElementById('suggestions').style.display = 'none';
-            renderUI(); // NÄITA KOHE!
-            save(); // SAADA TAUSTAL!
+            renderUI();
+            save();
         }
 
         function del(idx) {
             items.splice(idx, 1);
-            renderUI(); // NÄITA KOHE!
-            save(); // SAADA TAUSTAL!
+            renderUI();
+            save();
         }
 
         function clr() {
@@ -137,7 +133,7 @@ HTML
         }
 
         r();
-        setInterval(r, 2500); // Kontrolli teiste seadmete muudatusi iga 2.5 sek järel
+        setInterval(r, 2500);
         document.addEventListener('click', (e) => { if (e.target.id !== 'i') document.getElementById('suggestions').style.display = 'none'; });
     </script>
 </body>
