@@ -2,78 +2,90 @@
 <html lang="et">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>OstuGuru</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>OstuGuru Lõplik</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; padding: 15px; background: #f2f2f7; margin: 0; }
-        .card { background: white; padding: 20px; border-radius: 15px; max-width: 500px; margin: auto; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-        .row { display: flex; gap: 8px; margin-bottom: 15px; }
-        input { flex: 1; padding: 12px; border-radius: 10px; border: 1px solid #ccc; font-size: 16px; -webkit-appearance: none; }
-        button { cursor: pointer; border: none; font-weight: bold; border-radius: 10px; padding: 10px 15px; font-size: 14px; }
-        .add-btn { background: #007aff; color: white; }
-        .sync-btn { background: #e5e5ea; color: #000; font-size: 18px; }
-        .item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #eee; font-size: 18px; }
-        .del-btn { color: #ff3b30; background: none; font-size: 22px; font-weight: normal; }
-        .clear-btn { background: #ff3b30; color: white; width: 100%; margin-top: 20px; }
-        #l { min-height: 50px; }
+        body { font-family: -apple-system, system-ui, sans-serif; padding: 15px; background: #f2f2f7; margin: 0; -webkit-font-smoothing: antialiased; }
+        .card { background: white; padding: 25px; border-radius: 20px; max-width: 450px; margin: 10px auto; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        .row { display: flex; gap: 10px; margin-bottom: 20px; position: relative; }
+        .input-wrap { flex: 1; position: relative; }
+        input { width: 100%; padding: 16px; border-radius: 12px; border: 1px solid #ddd; font-size: 18px; outline: none; background: #f9f9f9; box-sizing: border-box; -webkit-appearance: none; }
+        #suggestions { position: absolute; background: white; border: 1px solid #ddd; width: 100%; z-index: 9999; border-radius: 12px; box-shadow: 0 8px 25px rgba(0,0,0,0.15); display: none; margin-top: 5px; max-height: 200px; overflow-y: auto; }
+        .suggestion { padding: 15px; border-bottom: 1px solid #eee; font-size: 18px; color: #000; }
+        button { cursor: pointer; border: none; font-weight: bold; border-radius: 12px; height: 56px; transition: opacity 0.2s; }
+        .add-btn { background: #007aff; color: white; padding: 0 25px; font-size: 16px; }
+        .item { display: flex; justify-content: space-between; align-items: center; padding: 15px 0; border-bottom: 1px solid #eee; font-size: 20px; }
+        .del-btn { color: #ff3b30; background: none; font-size: 28px; padding: 5px; font-weight: normal; }
+        .clear-btn { background: #ff3b30; color: white; width: 100%; margin-top: 25px; height: 50px; font-size: 16px; }
+        .status { font-size: 11px; color: #8e8e93; text-align: center; margin-top: 15px; min-height: 14px; }
     </style>
 </head>
 <body>
     <div class="card">
-        <div class="header">
-            <h2 style="margin:0;">🛒 OstuGuru</h2>
-            <button class="sync-btn" onclick="load()">🔄</button>
-        </div>
-        
+        <h1 style="text-align:center; margin-top:0;">🛒 OstuGuru</h1>
         <div class="row">
-            <input type="text" id="i" placeholder="Lisa toode..." onkeypress="if(event.key==='Enter')add()">
+            <div class="input-wrap">
+                <input type="text" id="i" placeholder="Lisa toode..." autocomplete="off" oninput="showSug()" onkeypress="if(event.key==='Enter')add()">
+                <div id="suggestions"></div>
+            </div>
             <button class="add-btn" onclick="add()">LISA</button>
         </div>
-        
-        <div id="l">Laadin...</div>
-        
-        <button class="clear-btn" onclick="clr()">🗑️ TÜHJENDA</button>
+        <div id="l">Laadin andmeid...</div>
+        <button class="clear-btn" onclick="clr()">🗑️ TÜHJENDA NIMEKIRI</button>
+        <div id="status" class="status"></div>
     </div>
 
     <script>
         const URL = 'https://script.google.com/macros/s/AKfycbxATYJCnKK5ffzrgi25YaDNpLQ_a5bFQJLEn6QuzSoev1NaRgOmH9gpnO2gueL1ckPuIg/exec'; 
         let items = [];
+        let history = new Set(JSON.parse(localStorage.getItem('og_history') || '[]'));
+        let isWriting = false;
 
-        // 1. Lae andmed
-        async function load() {
-            try {
-                const res = await fetch(URL + '?t=' + Date.now());
-                items = await res.json();
-                render();
-            } catch (e) {
-                document.getElementById('l').innerText = "Ühenduse viga. Vajuta 🔄";
-            }
-        }
-
-        // 2. Kuva ekraanil
+        // 1. KUVAMINE
         function render() {
             const listDiv = document.getElementById('l');
-            if (!items || items.length === 0) {
-                listDiv.innerHTML = '<p style="text-align:center; color:#999;">Nimekiri on tühi</p>';
+            if (items.length === 0) {
+                listDiv.innerHTML = '<p style="text-align:center; color:#888;">Nimekiri on tühi</p>';
             } else {
                 listDiv.innerHTML = items.map((x, idx) => `
-                    <div class="item">
-                        <span>📦 ${x}</span>
-                        <button class="del-btn" onclick="del(${idx})">✕</button>
-                    </div>
+                    <div class="item"><span>📦 ${x}</span><button class="del-btn" onclick="del(${idx})">✕</button></div>
                 `).join('');
             }
         }
 
-        // 3. Salvesta (kohe ja otse)
+        // 2. ANDMETE LAADIMINE (iPhone-sõbralik fetch)
+        async function load() {
+            if (isWriting) return;
+            try {
+                const res = await fetch(URL + '?nocache=' + new Date().getTime());
+                const data = await res.json();
+                if (Array.isArray(data) && JSON.stringify(data) !== JSON.stringify(items)) {
+                    items = data;
+                    items.forEach(x => history.add(x));
+                    localStorage.setItem('og_history', JSON.stringify(Array.from(history)));
+                    render();
+                }
+                document.getElementById('status').innerText = "Värskendatud: " + new Date().toLocaleTimeString();
+            } catch (e) {
+                console.log("Sünkroonimise ootel...");
+            }
+        }
+
+        // 3. SALVESTAMINE (Kiire ja kindel)
         async function save() {
-            render(); // Uuenda kohe ekraani
-            await fetch(URL, {
-                method: 'POST',
-                mode: 'no-cors',
-                body: JSON.stringify(items)
-            });
+            isWriting = true;
+            render();
+            try {
+                await fetch(URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    body: JSON.stringify(items)
+                });
+                // Anname Google'ile 2 sekundit aega enne kui uuesti laadida lubame
+                setTimeout(() => { isWriting = false; }, 2000);
+            } catch (e) {
+                isWriting = false;
+            }
         }
 
         function add() {
@@ -81,7 +93,9 @@
             const val = input.value.trim();
             if (!val) return;
             items.unshift(val);
+            history.add(val);
             input.value = '';
+            document.getElementById('suggestions').style.display = 'none';
             save();
         }
 
@@ -91,16 +105,38 @@
         }
 
         function clr() {
-            if (confirm("Tühjenda?")) {
+            if (confirm("Kas tühjendame kogu nimekirja?")) {
                 items = [];
                 save();
             }
         }
 
-        // Käivita kohe
+        function showSug() {
+            const val = document.getElementById('i').value.toLowerCase();
+            const sugDiv = document.getElementById('suggestions');
+            sugDiv.innerHTML = '';
+            if (val.length < 1) { sugDiv.style.display = 'none'; return; }
+            const fil = Array.from(history).filter(x => x.toLowerCase().startsWith(val)).slice(0, 5);
+            if (fil.length > 0) {
+                fil.forEach(s => {
+                    const d = document.createElement('div');
+                    d.className = 'suggestion'; d.innerText = s;
+                    d.onclick = () => { document.getElementById('i').value = s; sugDiv.style.display = 'none'; add(); };
+                    sugDiv.appendChild(d);
+                });
+                sugDiv.style.display = 'block';
+            } else { sugDiv.style.display = 'none'; }
+        }
+
+        // Algkäivitus
         load();
-        // Kontrolli teisi seadmeid iga 20 sekundi järel
-        setInterval(load, 20000);
+        // Automaatne kontroll iga 6 sekundi järel
+        setInterval(load, 6000);
+
+        // Peida soovitused mujale klikkides
+        document.addEventListener('click', (e) => {
+            if (e.target.id !== 'i') document.getElementById('suggestions').style.display = 'none';
+        });
     </script>
 </body>
 </html>
