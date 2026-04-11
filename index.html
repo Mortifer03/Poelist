@@ -1,142 +1,110 @@
 <!DOCTYPE html>
-<html lang="et">
+<html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>OstuGuru Lõplik</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>OstuGuru</title>
     <style>
-        body { font-family: -apple-system, system-ui, sans-serif; padding: 15px; background: #f2f2f7; margin: 0; -webkit-font-smoothing: antialiased; }
-        .card { background: white; padding: 25px; border-radius: 20px; max-width: 450px; margin: 10px auto; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
-        .row { display: flex; gap: 10px; margin-bottom: 20px; position: relative; }
-        .input-wrap { flex: 1; position: relative; }
-        input { width: 100%; padding: 16px; border-radius: 12px; border: 1px solid #ddd; font-size: 18px; outline: none; background: #f9f9f9; box-sizing: border-box; -webkit-appearance: none; }
-        #suggestions { position: absolute; background: white; border: 1px solid #ddd; width: 100%; z-index: 9999; border-radius: 12px; box-shadow: 0 8px 25px rgba(0,0,0,0.15); display: none; margin-top: 5px; max-height: 200px; overflow-y: auto; }
-        .suggestion { padding: 15px; border-bottom: 1px solid #eee; font-size: 18px; color: #000; }
-        button { cursor: pointer; border: none; font-weight: bold; border-radius: 12px; height: 56px; transition: opacity 0.2s; }
-        .add-btn { background: #007aff; color: white; padding: 0 25px; font-size: 16px; }
+        body { font-family: -apple-system, sans-serif; background: #f2f2f7; margin: 0; padding: 15px; }
+        .card { background: white; padding: 20px; border-radius: 20px; max-width: 450px; margin: auto; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+        .row { display: flex; gap: 8px; margin-bottom: 20px; position: relative; }
+        input { flex: 1; padding: 15px; border-radius: 12px; border: 1px solid #ccc; font-size: 18px; outline: none; -webkit-appearance: none; }
+        #sug { position: absolute; background: white; border: 1px solid #ddd; width: calc(100% - 85px); z-index: 99; border-radius: 12px; box-shadow: 0 8px 20px rgba(0,0,0,0.1); display: none; margin-top: 55px; }
+        .s { padding: 15px; border-bottom: 1px solid #eee; font-size: 18px; }
+        button { cursor: pointer; border: none; font-weight: bold; border-radius: 12px; }
+        .add { background: #007aff; color: white; padding: 0 20px; height: 55px; }
         .item { display: flex; justify-content: space-between; align-items: center; padding: 15px 0; border-bottom: 1px solid #eee; font-size: 20px; }
-        .del-btn { color: #ff3b30; background: none; font-size: 28px; padding: 5px; font-weight: normal; }
-        .clear-btn { background: #ff3b30; color: white; width: 100%; margin-top: 25px; height: 50px; font-size: 16px; }
-        .status { font-size: 11px; color: #8e8e93; text-align: center; margin-top: 15px; min-height: 14px; }
+        .del { color: #ff3b30; background: none; font-size: 28px; }
+        .clr { background: #ff3b30; color: white; width: 100%; margin-top: 25px; height: 45px; }
     </style>
 </head>
 <body>
     <div class="card">
-        <h1 style="text-align:center; margin-top:0;">🛒 OstuGuru</h1>
+        <h2 style="text-align:center;">🛒 OstuGuru</h2>
         <div class="row">
-            <div class="input-wrap">
-                <input type="text" id="i" placeholder="Lisa toode..." autocomplete="off" oninput="showSug()" onkeypress="if(event.key==='Enter')add()">
-                <div id="suggestions"></div>
-            </div>
-            <button class="add-btn" onclick="add()">LISA</button>
+            <input type="text" id="i" placeholder="Lisa toode..." oninput="naita()">
+            <div id="sug"></div>
+            <button class="add" onclick="lisa()">LISA</button>
         </div>
-        <div id="l">Laadin andmeid...</div>
-        <button class="clear-btn" onclick="clr()">🗑️ TÜHJENDA NIMEKIRI</button>
-        <div id="status" class="status"></div>
+        <div id="list">Laadin...</div>
+        <button class="clr" onclick="tyhja()">TÜHJENDA NIMEKIRI</button>
     </div>
 
     <script>
-        const URL = 'https://script.google.com/macros/s/AKfycbxATYJCnKK5ffzrgi25YaDNpLQ_a5bFQJLEn6QuzSoev1NaRgOmH9gpnO2gueL1ckPuIg/exec'; 
-        let items = [];
-        let history = new Set(JSON.parse(localStorage.getItem('og_history') || '[]'));
-        let isWriting = false;
+        var URL = 'https://script.google.com/macros/s/AKfycbxATYJCnKK5ffzrgi25YaDNpLQ_a5bFQJLEn6QuzSoev1NaRgOmH9gpnO2gueL1ckPuIg/exec';
+        var asjad = [];
+        var ajalugu = JSON.parse(localStorage.getItem('og_ajalugu') || '[]');
 
-        // 1. KUVAMINE
-        function render() {
-            const listDiv = document.getElementById('l');
-            if (items.length === 0) {
-                listDiv.innerHTML = '<p style="text-align:center; color:#888;">Nimekiri on tühi</p>';
-            } else {
-                listDiv.innerHTML = items.map((x, idx) => `
-                    <div class="item"><span>📦 ${x}</span><button class="del-btn" onclick="del(${idx})">✕</button></div>
-                `).join('');
-            }
-        }
-
-        // 2. ANDMETE LAADIMINE (iPhone-sõbralik fetch)
-        async function load() {
-            if (isWriting) return;
+        async function lae() {
             try {
-                const res = await fetch(URL + '?nocache=' + new Date().getTime());
-                const data = await res.json();
-                if (Array.isArray(data) && JSON.stringify(data) !== JSON.stringify(items)) {
-                    items = data;
-                    items.forEach(x => history.add(x));
-                    localStorage.setItem('og_history', JSON.stringify(Array.from(history)));
-                    render();
+                var r = await fetch(URL + "?t=" + new Date().getTime());
+                var d = await r.json();
+                if (JSON.stringify(d) !== JSON.stringify(asjad)) {
+                    asjad = d;
+                    kuva();
                 }
-                document.getElementById('status').innerText = "Värskendatud: " + new Date().toLocaleTimeString();
-            } catch (e) {
-                console.log("Sünkroonimise ootel...");
-            }
+            } catch (e) { console.log("viga"); }
         }
 
-        // 3. SALVESTAMINE (Kiire ja kindel)
-        async function save() {
-            isWriting = true;
-            render();
-            try {
-                await fetch(URL, {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    body: JSON.stringify(items)
+        function kuva() {
+            var h = "";
+            if (asjad.length === 0) { h = "<p style='text-align:center; color:#999;'>Tühi</p>"; }
+            else {
+                for (var i = 0; i < asjad.length; i++) {
+                    h += '<div class="item"><span>📦 ' + asjad[i] + '</span>' +
+                         '<button class="del" onclick="kustuta(' + i + ')">✕</button></div>';
+                }
+            }
+            document.getElementById('list').innerHTML = h;
+        }
+
+        async function sada() {
+            kuva();
+            fetch(URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(asjad) });
+        }
+
+        function lisa() {
+            var sis = document.getElementById('i');
+            var v = sis.value.trim();
+            if (!v) return;
+            asjad.unshift(v);
+            if (ajalugu.indexOf(v) === -1) {
+                ajalugu.push(v);
+                localStorage.setItem('og_ajalugu', JSON.stringify(ajalugu));
+            }
+            sis.value = "";
+            document.getElementById('sug').style.display = "none";
+            sada();
+        }
+
+        function kustuta(n) {
+            asjad.splice(n, 1);
+            sada();
+        }
+
+        function tyhja() {
+            if (confirm("Kas kõik?")) { asjad = []; sada(); }
+        }
+
+        function naita() {
+            var v = document.getElementById('i').value.toLowerCase();
+            var sDiv = document.getElementById('sug');
+            sDiv.innerHTML = "";
+            if (v.length < 1) { sDiv.style.display = "none"; return; }
+            var f = ajalugu.filter(x => x.toLowerCase().startsWith(v)).slice(0, 5);
+            if (f.length > 0) {
+                f.forEach(t => {
+                    var d = document.createElement('div');
+                    d.className = 's'; d.innerText = t;
+                    d.onclick = function() { document.getElementById('i').value = t; lisa(); };
+                    sDiv.appendChild(d);
                 });
-                // Anname Google'ile 2 sekundit aega enne kui uuesti laadida lubame
-                setTimeout(() => { isWriting = false; }, 2000);
-            } catch (e) {
-                isWriting = false;
-            }
+                sDiv.style.display = "block";
+            } else { sDiv.style.display = "none"; }
         }
 
-        function add() {
-            const input = document.getElementById('i');
-            const val = input.value.trim();
-            if (!val) return;
-            items.unshift(val);
-            history.add(val);
-            input.value = '';
-            document.getElementById('suggestions').style.display = 'none';
-            save();
-        }
-
-        function del(idx) {
-            items.splice(idx, 1);
-            save();
-        }
-
-        function clr() {
-            if (confirm("Kas tühjendame kogu nimekirja?")) {
-                items = [];
-                save();
-            }
-        }
-
-        function showSug() {
-            const val = document.getElementById('i').value.toLowerCase();
-            const sugDiv = document.getElementById('suggestions');
-            sugDiv.innerHTML = '';
-            if (val.length < 1) { sugDiv.style.display = 'none'; return; }
-            const fil = Array.from(history).filter(x => x.toLowerCase().startsWith(val)).slice(0, 5);
-            if (fil.length > 0) {
-                fil.forEach(s => {
-                    const d = document.createElement('div');
-                    d.className = 'suggestion'; d.innerText = s;
-                    d.onclick = () => { document.getElementById('i').value = s; sugDiv.style.display = 'none'; add(); };
-                    sugDiv.appendChild(d);
-                });
-                sugDiv.style.display = 'block';
-            } else { sugDiv.style.display = 'none'; }
-        }
-
-        // Algkäivitus
-        load();
-        // Automaatne kontroll iga 6 sekundi järel
-        setInterval(load, 6000);
-
-        // Peida soovitused mujale klikkides
-        document.addEventListener('click', (e) => {
-            if (e.target.id !== 'i') document.getElementById('suggestions').style.display = 'none';
-        });
+        lae();
+        setInterval(lae, 5000);
     </script>
 </body>
 </html>
