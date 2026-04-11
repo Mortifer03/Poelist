@@ -1,115 +1,151 @@
 <!DOCTYPE html>
-<html>
+<html lang="et">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>OstuGuru</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>OstuGuru Pro</title>
     <style>
-        body { font-family: -apple-system, sans-serif; background: #f2f2f7; margin: 0; padding: 15px; }
-        .card { background: white; padding: 20px; border-radius: 15px; max-width: 450px; margin: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .row { display: flex; gap: 8px; margin-bottom: 15px; position: relative; }
-        input { flex: 1; padding: 15px; border-radius: 10px; border: 1px solid #ccc; font-size: 18px; outline: none; -webkit-appearance: none; }
-        #sug { position: absolute; background: white; border: 1px solid #ddd; width: calc(100% - 90px); z-index: 100; border-radius: 10px; display: none; margin-top: 55px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        .s { padding: 15px; border-bottom: 1px solid #eee; font-size: 18px; color: #000; }
-        button { cursor: pointer; border: none; font-weight: bold; border-radius: 10px; padding: 0 15px; height: 55px; }
-        .add { background: #007aff; color: white; min-width: 70px; }
-        .item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #eee; font-size: 19px; }
-        .del { color: #ff3b30; background: none; font-size: 26px; }
-        .clr { background: #ff3b30; color: white; width: 100%; margin-top: 20px; font-size: 14px; }
-        .st { font-size: 11px; text-align: center; color: #8e8e93; margin-top: 15px; }
+        body { font-family: -apple-system, system-ui, sans-serif; background: #f2f2f7; margin: 0; padding: 15px; -webkit-tap-highlight-color: transparent; }
+        .card { background: white; padding: 25px; border-radius: 20px; max-width: 450px; margin: auto; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+        .row { display: flex; gap: 10px; margin-bottom: 20px; position: relative; }
+        .input-wrap { flex: 1; position: relative; display: flex; }
+        input { width: 100%; padding: 16px; border-radius: 12px; border: 1px solid #ccc; font-size: 18px; outline: none; background: #fff; -webkit-appearance: none; }
+        
+        /* Ennustuse akna stiil */
+        #sug { 
+            position: absolute; background: white; border: 1px solid #ddd; width: 100%; z-index: 999; 
+            border-radius: 12px; display: none; margin-top: 58px; box-shadow: 0 8px 25px rgba(0,0,0,0.15); 
+            max-height: 200px; overflow-y: auto;
+        }
+        .s { padding: 15px; border-bottom: 1px solid #eee; font-size: 18px; color: #000; cursor: pointer; }
+        
+        button { cursor: pointer; border: none; font-weight: bold; border-radius: 12px; transition: opacity 0.2s; }
+        .add-btn { background: #007aff; color: white; padding: 0 20px; height: 56px; font-size: 16px; }
+        .item { display: flex; justify-content: space-between; align-items: center; padding: 15px 0; border-bottom: 1px solid #eee; font-size: 20px; }
+        .del-btn { color: #ff3b30; background: none; font-size: 28px; padding: 5px; }
+        .clear-btn { background: #ff3b30; color: white; width: 100%; margin-top: 25px; height: 50px; font-size: 16px; }
+        .status { font-size: 11px; text-align: center; color: #8e8e93; margin-top: 15px; min-height: 14px; }
     </style>
 </head>
 <body>
     <div class="card">
-        <h2 style="text-align:center; margin-top:0;">🛒 OstuGuru</h2>
+        <h1 style="text-align:center; margin-top:0;">🛒 OstuGuru</h1>
         <div class="row">
-            <input type="text" id="i" placeholder="Lisa toode..." oninput="naita()" onkeypress="if(event.key==='Enter')lisa()">
-            <div id="sug"></div>
-            <button class="add" onclick="lisa()">LISA</button>
+            <div class="input-wrap">
+                <input type="text" id="i" placeholder="Lisa toode..." autocomplete="off" oninput="showSug()" onkeypress="if(event.key==='Enter')add()">
+                <div id="sug"></div>
+            </div>
+            <button class="add-btn" onclick="add()">LISA</button>
         </div>
-        <div id="list">Ootan...</div>
-        <button class="clr" onclick="tyhja()">TÜHJENDA NIMEKIRI</button>
-        <div id="st" class="st">Sünkroonis</div>
+        <div id="l">Laadin nimekirja...</div>
+        <button class="clear-btn" onclick="clr()">🗑️ TÜHJENDA NIMEKIRI</button>
+        <div id="st" class="status">Ühendan pilvega...</div>
     </div>
 
     <script>
-        const URL = 'https://script.google.com/macros/s/AKfycbxATYJCnKK5ffzrgi25YaDNpLQ_a5bFQJLEn6QuzSoev1NaRgOmH9gpnO2gueL1ckPuIg/exec';
-        let asjad = JSON.parse(localStorage.getItem('og_items') || '[]');
-        let ajalugu = JSON.parse(localStorage.getItem('og_hist') || '[]');
+        const URL = 'https://script.google.com/macros/s/AKfycbzCwY-jJnNuRxH2vdlSkL4GfXS3NG6WIfBEfrzPSbJIR2b_elI0smViB4v9HEGuQphx/exec';
+        
+        let items = [];
+        // Laeme ajaloo telefoni mälust
+        let history = JSON.parse(localStorage.getItem('og_history') || '[]');
 
-        function kuva() {
-            const listDiv = document.getElementById('list');
-            if (asjad.length === 0) {
-                listDiv.innerHTML = '<p style="text-align:center; color:#999;">Tühi</p>';
+        function renderUI() {
+            const listDiv = document.getElementById('l');
+            if (items.length === 0) {
+                listDiv.innerHTML = '<p style="text-align:center; color:#999; padding: 20px 0;">Nimekiri on tühi</p>';
             } else {
-                listDiv.innerHTML = asjad.map((x, idx) => `
-                    <div class="item"><span>📦 ${x}</span><button class="del" onclick="kustuta(${idx})">✕</button></div>
+                listDiv.innerHTML = items.map((x, idx) => `
+                    <div class="item"><span>📦 ${x}</span><button class="del-btn" onclick="del(${idx})">✕</button></div>
                 `).join('');
             }
-            localStorage.setItem('og_items', JSON.stringify(asjad));
-            localStorage.setItem('og_hist', JSON.stringify(ajalugu));
+            // Salvestame ajaloo alati, kui midagi muutub
+            localStorage.setItem('og_history', JSON.stringify(history));
         }
 
-        async function sync(m = 'GET', b = null) {
+        // iPhone-i sõbralik andmete laadimine (JSONP)
+        function load() {
+            const script = document.createElement('script');
+            script.src = URL + "?callback=handleResponse&t=" + Date.now();
+            document.body.appendChild(script);
+            document.body.removeChild(script);
+        }
+
+        window.handleResponse = function(data) {
+            items = data;
+            // Uuendame ka ajalugu uute asjadega pilvest
+            items.forEach(x => { if(!history.includes(x)) history.push(x); });
+            renderUI();
+            document.getElementById('st').innerText = "Värskendatud: " + new Date().toLocaleTimeString();
+        };
+
+        async function save() {
+            renderUI();
             try {
-                const opt = { method: m };
-                if (b) { opt.body = JSON.stringify(b); opt.mode = 'no-cors'; }
-                const r = await fetch(URL + (m === 'GET' ? '?t=' + Date.now() : ''), opt);
-                if (m === 'GET') {
-                    const d = await r.json();
-                    if (Array.isArray(d)) {
-                        asjad = d;
-                        asjad.forEach(x => { if(!ajalugu.includes(x)) ajalugu.push(x); });
-                        kuva();
-                        document.getElementById('st').innerText = "Värskendatud: " + new Date().toLocaleTimeString();
-                    }
-                }
-            } catch (e) { document.getElementById('st').innerText = "Ühenduseta režiim"; }
+                await fetch(URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    body: JSON.stringify(items)
+                });
+            } catch (e) {
+                document.getElementById('st').innerText = "Salvestamise viga, aga nimekiri on telefonis alles.";
+            }
         }
 
-        function lisa() {
+        function add() {
             const input = document.getElementById('i');
-            const v = input.value.trim();
-            if (!v) return;
-            asjad.unshift(v);
-            if (!ajalugu.includes(v)) ajalugu.push(v);
+            const val = input.value.trim();
+            if (!val) return;
+            
+            items.unshift(val);
+            if (!history.includes(val)) history.push(val);
             input.value = '';
             document.getElementById('sug').style.display = 'none';
-            kuva();
-            sync('POST', asjad);
+            save();
         }
 
-        function kustuta(idx) {
-            asjad.splice(idx, 1);
-            kuva();
-            sync('POST', asjad);
+        function del(idx) {
+            items.splice(idx, 1);
+            save();
         }
 
-        function tyhja() {
-            if (confirm("Tühjenda?")) { asjad = []; kuva(); sync('POST', asjad); }
+        function clr() {
+            if (confirm("Kas tühjendame kogu nimekirja?")) {
+                items = [];
+                save();
+            }
         }
 
-        function naita() {
-            const v = document.getElementById('i').value.toLowerCase();
-            const sDiv = document.getElementById('sug');
-            sDiv.innerHTML = '';
-            if (v.length < 1) { sDiv.style.display = 'none'; return; }
-            const f = ajalugu.filter(x => x.toLowerCase().startsWith(v)).slice(0, 5);
-            if (f.length > 0) {
-                f.forEach(t => {
+        // ENNUSTUSE FUNKTSIOON
+        function showSug() {
+            const val = document.getElementById('i').value.toLowerCase();
+            const sugDiv = document.getElementById('sug');
+            sugDiv.innerHTML = '';
+            if (val.length < 1) { sugDiv.style.display = 'none'; return; }
+            
+            const filtered = history.filter(x => x.toLowerCase().startsWith(val)).slice(0, 5);
+            
+            if (filtered.length > 0) {
+                filtered.forEach(t => {
                     const d = document.createElement('div');
                     d.className = 's'; d.innerText = t;
-                    d.onclick = () => { document.getElementById('i').value = t; sDiv.style.display = 'none'; lisa(); };
-                    sDiv.appendChild(d);
+                    d.onclick = () => { document.getElementById('i').value = t; sugDiv.style.display = 'none'; add(); };
+                    sugDiv.appendChild(d);
                 });
-                sDiv.style.display = 'block';
-            } else { sDiv.style.display = 'none'; }
+                sugDiv.style.display = 'block';
+            } else {
+                sugDiv.style.display = 'none';
+            }
         }
 
-        kuva();
-        sync();
-        setInterval(sync, 10000);
-        document.addEventListener('click', (e) => { if (e.target.id !== 'i') document.getElementById('sug').style.display = 'none'; });
+        // Esmane laadimine
+        load();
+        // Sünkrooni iga 10 sekundi järel
+        setInterval(load, 10000);
+
+        // Peida soovitused mujale klikkides
+        document.addEventListener('click', (e) => {
+            if (e.target.id !== 'i') document.getElementById('sug').style.display = 'none';
+        });
     </script>
 </body>
 </html>
