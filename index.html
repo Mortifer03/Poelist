@@ -1,22 +1,22 @@
 <!DOCTYPE html>
-<html lang="et">
+<html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>OstuGuru - Toimiv Versioon</title>
+    <title>OstuGuru</title>
     <style>
-        body { font-family: sans-serif; background: #e8eaed; margin: 0; padding: 15px; }
-        .card { background: white; padding: 25px; border-radius: 16px; max-width: 450px; margin: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .row { display: flex; gap: 10px; margin-bottom: 20px; position: relative; }
-        input { flex: 1; padding: 15px; border-radius: 8px; border: 1px solid #dadce0; font-size: 18px; outline: none; }
-        #sug { position: absolute; background: white; border: 1px solid #dadce0; width: calc(100% - 100px); z-index: 100; border-radius: 8px; display: none; margin-top: 55px; }
-        .s { padding: 12px 15px; border-bottom: 1px solid #f1f3f4; font-size: 16px; cursor: pointer; color: black; }
-        button { cursor: pointer; border: none; font-weight: bold; border-radius: 8px; }
-        .add { background: #1a73e8; color: white; padding: 0 20px; height: 52px; }
-        .item { display: flex; justify-content: space-between; align-items: center; padding: 15px 0; border-bottom: 1px solid #f1f3f4; font-size: 18px; }
-        .del { color: #d93025; background: none; font-size: 24px; }
-        .clr { background: #d93025; color: white; width: 100%; margin-top: 20px; height: 45px; font-size: 14px; }
-        .stat { font-size: 11px; text-align: center; color: #70757a; margin-top: 15px; }
+        body { font-family: -apple-system, sans-serif; background: #f2f2f7; margin: 0; padding: 15px; }
+        .card { background: white; padding: 20px; border-radius: 15px; max-width: 450px; margin: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .row { display: flex; gap: 8px; margin-bottom: 15px; position: relative; }
+        input { flex: 1; padding: 15px; border-radius: 10px; border: 1px solid #ccc; font-size: 18px; outline: none; -webkit-appearance: none; }
+        #sug { position: absolute; background: white; border: 1px solid #ddd; width: calc(100% - 90px); z-index: 100; border-radius: 10px; display: none; margin-top: 55px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .s { padding: 15px; border-bottom: 1px solid #eee; font-size: 18px; color: #000; }
+        button { cursor: pointer; border: none; font-weight: bold; border-radius: 10px; padding: 0 15px; height: 55px; }
+        .add { background: #007aff; color: white; min-width: 70px; }
+        .item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #eee; font-size: 19px; }
+        .del { color: #ff3b30; background: none; font-size: 26px; }
+        .clr { background: #ff3b30; color: white; width: 100%; margin-top: 20px; font-size: 14px; }
+        .st { font-size: 11px; text-align: center; color: #8e8e93; margin-top: 15px; }
     </style>
 </head>
 <body>
@@ -27,90 +27,76 @@
             <div id="sug"></div>
             <button class="add" onclick="lisa()">LISA</button>
         </div>
-        <div id="list">Laadin...</div>
+        <div id="list">Ootan...</div>
         <button class="clr" onclick="tyhja()">TÜHJENDA NIMEKIRI</button>
-        <div id="stat" class="stat">Kontrollin ühendust...</div>
+        <div id="st" class="st">Sünkroonis</div>
     </div>
 
     <script>
-        // KONTROLLI SEDA URL-I! See peab olema täpselt sama, mis Google Scriptis "Web App" URL.
         const URL = 'https://script.google.com/macros/s/AKfycbxATYJCnKK5ffzrgi25YaDNpLQ_a5bFQJLEn6QuzSoev1NaRgOmH9gpnO2gueL1ckPuIg/exec';
-        
-        let items = JSON.parse(localStorage.getItem('og_items') || '[]');
-        let history = JSON.parse(localStorage.getItem('og_history') || '[]');
+        let asjad = JSON.parse(localStorage.getItem('og_items') || '[]');
+        let ajalugu = JSON.parse(localStorage.getItem('og_hist') || '[]');
 
-        function render() {
+        function kuva() {
             const listDiv = document.getElementById('list');
-            if (items.length === 0) {
-                listDiv.innerHTML = '<p style="text-align:center; color:#70757a;">Nimekiri on tühi</p>';
+            if (asjad.length === 0) {
+                listDiv.innerHTML = '<p style="text-align:center; color:#999;">Tühi</p>';
             } else {
-                listDiv.innerHTML = items.map((x, idx) => `
+                listDiv.innerHTML = asjad.map((x, idx) => `
                     <div class="item"><span>📦 ${x}</span><button class="del" onclick="kustuta(${idx})">✕</button></div>
                 `).join('');
             }
-            localStorage.setItem('og_items', JSON.stringify(items));
-            localStorage.setItem('og_history', JSON.stringify(history));
+            localStorage.setItem('og_items', JSON.stringify(asjad));
+            localStorage.setItem('og_hist', JSON.stringify(ajalugu));
         }
 
-        async function sync(method = 'GET', body = null) {
+        async function sync(m = 'GET', b = null) {
             try {
-                const opt = { method: method };
-                if (body) {
-                    opt.body = JSON.stringify(body);
-                    opt.mode = 'no-cors';
-                }
-                
-                const res = await fetch(URL + (method === 'GET' ? '?t=' + Date.now() : ''), opt);
-                
-                if (method === 'GET') {
-                    const data = await res.json();
-                    if (Array.isArray(data)) {
-                        items = data;
-                        items.forEach(x => { if(!history.includes(x)) history.push(x); });
-                        render();
-                        document.getElementById('stat').innerText = "Viimati värskendatud: " + new Date().toLocaleTimeString();
+                const opt = { method: m };
+                if (b) { opt.body = JSON.stringify(b); opt.mode = 'no-cors'; }
+                const r = await fetch(URL + (m === 'GET' ? '?t=' + Date.now() : ''), opt);
+                if (m === 'GET') {
+                    const d = await r.json();
+                    if (Array.isArray(d)) {
+                        asjad = d;
+                        asjad.forEach(x => { if(!ajalugu.includes(x)) ajalugu.push(x); });
+                        kuva();
+                        document.getElementById('st').innerText = "Värskendatud: " + new Date().toLocaleTimeString();
                     }
                 }
-            } catch (e) {
-                document.getElementById('stat').innerText = "Ühenduseta režiim";
-                console.log(e);
-            }
+            } catch (e) { document.getElementById('st').innerText = "Ühenduseta režiim"; }
         }
 
         function lisa() {
             const input = document.getElementById('i');
-            const val = input.value.trim();
-            if (!val) return;
-            items.unshift(val);
-            if (!history.includes(val)) history.push(val);
+            const v = input.value.trim();
+            if (!v) return;
+            asjad.unshift(v);
+            if (!ajalugu.includes(v)) ajalugu.push(v);
             input.value = '';
             document.getElementById('sug').style.display = 'none';
-            render();
-            sync('POST', items);
+            kuva();
+            sync('POST', asjad);
         }
 
         function kustuta(idx) {
-            items.splice(idx, 1);
-            render();
-            sync('POST', items);
+            asjad.splice(idx, 1);
+            kuva();
+            sync('POST', asjad);
         }
 
         function tyhja() {
-            if (confirm("Kas tühjendame?")) {
-                items = [];
-                render();
-                sync('POST', items);
-            }
+            if (confirm("Tühjenda?")) { asjad = []; kuva(); sync('POST', asjad); }
         }
 
         function naita() {
-            const val = document.getElementById('i').value.toLowerCase();
+            const v = document.getElementById('i').value.toLowerCase();
             const sDiv = document.getElementById('sug');
             sDiv.innerHTML = '';
-            if (val.length < 1) { sDiv.style.display = 'none'; return; }
-            const fil = history.filter(x => x.toLowerCase().startsWith(val)).slice(0, 5);
-            if (fil.length > 0) {
-                fil.forEach(t => {
+            if (v.length < 1) { sDiv.style.display = 'none'; return; }
+            const f = ajalugu.filter(x => x.toLowerCase().startsWith(v)).slice(0, 5);
+            if (f.length > 0) {
+                f.forEach(t => {
                     const d = document.createElement('div');
                     d.className = 's'; d.innerText = t;
                     d.onclick = () => { document.getElementById('i').value = t; sDiv.style.display = 'none'; lisa(); };
@@ -120,13 +106,10 @@
             } else { sDiv.style.display = 'none'; }
         }
 
-        render(); 
+        kuva();
         sync();
         setInterval(sync, 10000);
-
-        document.addEventListener('click', (e) => {
-            if (e.target.id !== 'i') document.getElementById('sug').style.display = 'none';
-        });
+        document.addEventListener('click', (e) => { if (e.target.id !== 'i') document.getElementById('sug').style.display = 'none'; });
     </script>
 </body>
 </html>
